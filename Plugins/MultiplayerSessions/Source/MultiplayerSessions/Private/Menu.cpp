@@ -45,6 +45,8 @@ void UMenu::SetupMenu(int32 NumberOfPublicConnections, FString TypeOfMatch, int3
 		MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionComplete.AddDynamic(this, &ThisClass::OnDestroySession);
 	}
 	FWorldDelegates::LevelRemovedFromWorld.AddUObject(this, &UMenu::OnLevelRemovedFromWorld);
+	HostButton->bIsEnabled = false;
+	//HostButton->
 }
 
 bool UMenu::Initialize()
@@ -99,6 +101,7 @@ void UMenu::ShutOffMenu()
 
 void UMenu::OnCreateSession(bool bWasSuccessful)
 {
+	return;
 	// Print the session created result
 	if (bWasSuccessful)
 	{
@@ -135,6 +138,7 @@ void UMenu::OnCreateSession(bool bWasSuccessful)
 
 void UMenu::OnFindSessions(const TArray<FOnlineSessionSearchResult>& SessionResults, bool bWasSuccessful)
 {
+	return;
 	if (MultiplayerSessionsSubsystem == nullptr)
 	{
 		return;
@@ -183,6 +187,7 @@ void UMenu::OnFindSessions(const TArray<FOnlineSessionSearchResult>& SessionResu
 
 void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
 {
+	return;
 	// Print the connected info and Client Travel to the new level
 	if (Result == EOnJoinSessionCompleteResult::Success)
 	{

@@ -3,6 +3,7 @@
 
 #include "MultiplayerSessionsSubsystem.h"
 #include "OnlineSubsystem.h"
+#include "Kismet/GameplayStatics.h"
 
 UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 	CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnCreateSessionComplete)),
@@ -20,6 +21,12 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 
 void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FString MatchType)
 {
+	UE_LOG(LogTemp, Warning, TEXT("Called init"));
+	IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+	if (Subsystem)
+	{
+		OnlineSessionInterface = Subsystem->GetSessionInterface();
+	}
 	if (!OnlineSessionInterface.IsValid())
 	{
 		return;
@@ -29,7 +36,7 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 	LastMatchType = MatchType;
 	
 	// Remove the old session
-	if (OnlineSessionInterface->GetNamedSession(NAME_GameSession))
+	if (OnlineSessionInterface->GetNamedSession(ShooterSession))
 	{
 		bCreateSessionOnDestroy = true;
 		DestroySession();
@@ -57,7 +64,8 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 	// Check the session, if created in failure, then remove the delegate from the delegate list ('OnCreateSessionComplete' won't be called)
 	// and we broadcast the custom delegate.
 	// These operations will also be done when we created the session successfully, but here we do is just for 'early time'
-	if (!OnlineSessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings))
+	UE_LOG(LogTemp, Warning, TEXT("qwq Local player: %d"), LocalPlayer);
+	if (!OnlineSessionInterface->CreateSession(0, ShooterSession, *LastSessionSettings))
 	{
 		OnlineSessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 		// Broadcast our own custom delegate
@@ -103,10 +111,15 @@ void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult
 
 	// Join the game session
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+	for (int i = 0; i < LastSessionSearch->SearchResults.Num(); i++)
+	{
+		OnlineSessionInterface->JoinSession(*LocalPlayer->GetPreferredUniqueNetId(), ShooterSession, SessionResult);
+		/*
 	if (!OnlineSessionInterface->JoinSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, SessionResult))
 	{
 		OnlineSessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
 		MultiplayerOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+	}*/
 	}
 }
 
@@ -124,9 +137,8 @@ void UMultiplayerSessionsSubsystem::DestroySession()
 	}
 	// Add the delegate to the delegate list
 	DestroySessionCompleteDelegateHandle = OnlineSessionInterface->AddOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegate);
-
 	// Destroy the session
-	if (!OnlineSessionInterface->DestroySession(NAME_GameSession))
+	if (!OnlineSessionInterface->DestroySession(ShooterSession))
 	{
 		OnlineSessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
 		MultiplayerOnDestroySessionComplete.Broadcast(false);
@@ -144,6 +156,12 @@ void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, b
 	
 	// Broadcast our own custom delegate
 	MultiplayerOnCreateSessionComplete.Broadcast(bWasSuccessful);
+	UE_LOG(LogTemp, Warning, TEXT("Session Creation: %d"), bWasSuccessful);
+	if (bWasSuccessful)
+	{
+		UGameplayStatics::OpenLevel(GetWorld(), FName("/Game/Maps/Lobby"), true, "?listen");
+	}
+	//OnlineSessionInterface->DestroySession(SessionName);
 }
 
 void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
@@ -152,6 +170,7 @@ void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	{
 		return;
 	}
+	UE_LOG(LogTemp,Warning, TEXT("Found sessions with result: %d, num: %d"), bWasSuccessful, LastSessionSearch->SearchResults.Num());
 	// Remove the delegate from the delegate list
 	OnlineSessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 
@@ -160,9 +179,37 @@ void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		return;
 	}
-	
 	// Broadcast our own custom delegate
 	MultiplayerOnFindSessionsComplete.Broadcast(LastSessionSearch->SearchResults, bWasSuccessful);
+	
+	for (FOnlineSessionSearchResult Session : LastSessionSearch->SearchResults)
+	{
+		if (Session.Session.OwningUserName.Contains("pc-maksymets"))
+		{
+			JoinSessionCompleteDelegateHandle = OnlineSessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
+			ULocalPlayer* Player = GetWorld()->GetFirstLocalPlayerFromController();
+			OnlineSessionInterface->JoinSession(*Player->GetPreferredUniqueNetId(), ShooterSession, Session);
+			break;
+		}
+		else//Ignore
+			UE_LOG(LogTemp, Warning, TEXT("Ignoring session: %s"), *Session.Session.OwningUserName);
+	}
+		/*
+		TArray<FOnlineSessionSearchResult> Sessions = LastSessionSearch->SearchResults;
+		//for (FOnlineSessionSearchResult Session : Sessions)
+		{
+			FOnlineSessionSearchResult Sess = Sessions[i];
+			FOnlineSession Session = Sess.Session;
+			UE_LOG(LogTemp, Warning, TEXT("qwr\nNumber: %d\nPing: %d\nIs Valid: %d\nNetId: %s\nOwningUserName: %s\nIsDedicated: %d"), i, Sess.PingInMs, Sess.IsValid(), *Session.OwningUserId->ToString(), *Session.OwningUserName, Session.SessionSettings.bIsDedicated);
+		}
+
+
+		if(0 && LastSessionSearch->SearchResults[i].Session.OwningUserName.Contains(FString("pc-mak")))
+		{
+			OnlineSessionInterface->JoinSession(*Player->GetPreferredUniqueNetId(), ShooterSession, LastSessionSearch->SearchResults[i]);
+		}
+		*/
+	
 }
 
 void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
@@ -176,6 +223,13 @@ void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOn
 
 	// Broadcast our own custom delegate
 	MultiplayerOnJoinSessionComplete.Broadcast(Result);
+	UE_LOG(LogTemp, Warning, TEXT("Joining with result: %d"), static_cast<int32>(Result));
+	if (Result == EOnJoinSessionCompleteResult::Type::Success)
+	{
+		FString url;
+		OnlineSessionInterface->GetResolvedConnectString(SessionName, url);
+		UGameplayStatics::OpenLevel(GetWorld(), FName(url));
+	}
 }
 
 void UMultiplayerSessionsSubsystem::OnStartSessionComplete(FName SessionName, bool bWasSuccessful)

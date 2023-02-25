@@ -33,6 +33,7 @@ public:
 	//
 	// To handle session functionality. The Menu class will call this.
 	//
+	UFUNCTION(BlueprintCallable)
 	void CreateSession(int32 NumPublicConnections, FString MatchType);
 	void FindSessions(int32 MaxSearchResults);
 	void JoinSession(const FOnlineSessionSearchResult& SessionResult);
@@ -88,4 +89,5 @@ private:
 	bool bCreateSessionOnDestroy{false};
 	int32 LastNumPublicConnections{0};
 	FString LastMatchType{""};
+	FName ShooterSession{"MySessionName"};
 };
